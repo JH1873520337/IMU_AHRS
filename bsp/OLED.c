@@ -176,6 +176,57 @@ void OLED_ShowBinNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Leng
 }
 
 /**
+  * @brief  OLED显示浮点数
+  * @param  Line 行位置(1~4)
+  * @param  Column 列位置(1~16)
+  * @param  Number 要显示的浮点数
+  * @param  IntLen 整数部分长度
+  * @param  DecLen 小数部分长度
+  * @retval 无
+  * @example OLED_ShowFloat(1, 1, 1.234, 1, 2) 显示 "+1.23"
+  *          OLED_ShowFloat(2, 1, -12.5, 2, 1) 显示 "-12.5"
+  */
+void OLED_ShowFloat(uint8_t Line, uint8_t Column, float Number, uint8_t IntLen, uint8_t DecLen)
+{
+	uint8_t i;
+	int32_t IntPart;      // 整数部分
+	uint32_t DecPart;     // 小数部分
+	uint32_t temp;
+
+	// 显示符号
+	if (Number >= 0)
+	{
+		OLED_ShowChar(Line, Column, '+');
+		IntPart = (int32_t)Number;  // 获取整数部分
+	}
+	else
+	{
+		OLED_ShowChar(Line, Column, '-');
+		Number = -Number;           // 转为正数处理
+		IntPart = (int32_t)Number;
+	}
+
+	// 显示整数部分
+	for (i = 0; i < IntLen; i++)
+	{
+		OLED_ShowChar(Line, Column + i + 1, IntPart / OLED_Pow(10, IntLen - i - 1) % 10 + '0');
+	}
+
+	// 显示小数点
+	OLED_ShowChar(Line, Column + IntLen + 1, '.');
+
+	// 计算小数部分(放大到整数)
+	temp = (uint32_t)(Number * OLED_Pow(10, DecLen));  // 先放大
+	DecPart = temp % OLED_Pow(10, DecLen);              // 取小数部分
+
+	// 显示小数部分
+	for (i = 0; i < DecLen; i++)
+	{
+		OLED_ShowChar(Line, Column + IntLen + 2 + i, DecPart / OLED_Pow(10, DecLen - i - 1) % 10 + '0');
+	}
+}
+
+/**
   * @brief  OLED初始化（硬件I2C版）
   * @param  无
   * @retval 无
@@ -188,9 +239,8 @@ void OLED_Init(void)
 	for (i = 0; i < 1000; i++)
 		for (j = 0; j < 1000; j++);
 
-	// 硬件I2C已由CubeMX的MX_I2C1_Init初始化，无需再初始化引脚
 
-	// OLED寄存器配置（与原软件I2C一致）
+	// OLED寄存器配置
 	OLED_WriteCommand(0xAE);	// 关闭显示
 	OLED_WriteCommand(0xD5);	// 时钟分频
 	OLED_WriteCommand(0x80);

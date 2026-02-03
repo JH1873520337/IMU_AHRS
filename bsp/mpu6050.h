@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 /* 需在主程序中定义I2C句柄并外部引用 */
-extern I2C_HandleTypeDef hi2c2;  // 示例：使用I2C1，根据硬件修改
+extern I2C_HandleTypeDef hi2c2;
 #define MPU6050_I2C_HANDLE    &hi2c2
 //灵敏度
 #define ACCEL_SENSITIVITY 16384.0f  // AFS_SEL=0（±2g）对应的灵敏度
