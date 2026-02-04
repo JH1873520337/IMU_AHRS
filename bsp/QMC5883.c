@@ -26,7 +26,6 @@ HAL_StatusTypeDef QMC5883_WriteReg(uint8_t RegAddress, const uint8_t* Data, uint
                                    tx_buf, Size+1, 100);
 }
 
-/* 从QMC5883寄存器读单个字节 */
 HAL_StatusTypeDef QMC5883_ReadByte(uint8_t RegAddress, uint8_t* Data)
 {
     // 1. 发送要读取的寄存器地址
@@ -55,16 +54,38 @@ HAL_StatusTypeDef QMC5883_ReadReg(uint8_t RegAddress, uint8_t* Data, uint8_t Siz
 void QMC5883_Init(void)
 {
     HAL_Delay(100);
-    //过采样256，8G量程，100hz采样频率，连续模式
-    QMC5883_WriteByte(QMC5883_Control_Registers1, 0X69);
+
+    QMC5883_WriteByte(QMC5883_Control_Registers1, 0X0B);
     HAL_Delay(10);
-    //禁用中断，软复位，iic指针
-    QMC5883_WriteByte(QMC5883_Control_Registers2, 0X01);
+    QMC5883_WriteByte(QMC5883_Control_Registers2, 0X08);
     HAL_Delay(10);
-    QMC5883_WriteByte(QMC5883_SET_RESET_Period_Register, 0X01);
-    HAL_Delay(10);
+
 }
 
+void QMC5883_GetData(int16_t *MagX, int16_t *MagY, int16_t *MagZ)
+{
+    uint8_t magnetometer_data[6];
+    // 读磁力计（0x01-0x06，6字节）
+    QMC5883_ReadReg(QMC5883_DataOut_XLSB, magnetometer_data, 6);
+
+    // 拼接加速度数据
+    *MagX = (int16_t)((magnetometer_data[1] << 8) | magnetometer_data[0]);
+    *MagY = (int16_t)((magnetometer_data[3] << 8) | magnetometer_data[2]);
+    *MagZ = (int16_t)((magnetometer_data[5] << 8) | magnetometer_data[4]);
+}
+
+//获取测量的真实值，返回值单位为G
+void QMC5883_GetRealData(float *mx_real, float *my_real, float *mz_real)
+{
+    int16_t Mx_raw, My_raw, Mz_raw;
+
+    QMC5883_GetData(&Mx_raw, &My_raw, &Mz_raw);
+
+    *mx_real = (float)Mx_raw/MAG_SENSITIVITY ;
+    *my_real = (float)My_raw/MAG_SENSITIVITY ;
+    *mz_real = (float)Mz_raw/MAG_SENSITIVITY ;
+
+}
 
 
 uint8_t QMC5883_GetID(void)

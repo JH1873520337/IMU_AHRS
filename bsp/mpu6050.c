@@ -1,5 +1,5 @@
 #include "mpu6050.h"
-
+#include "math.h"
 /* 写单个字节到MPU6050寄存器 */
 /**
  *写单个字节到MPU6050寄存器
@@ -114,8 +114,10 @@ void MPU6050_GetData(int16_t *AccX, int16_t *AccY, int16_t *AccZ,
 
 /**
  * @brief 获取MPU6050的真实物理数据
- * @param 返回值，直接将变量的地址给函数，可以得到实际测算值
+ * @param 返回值，直接将变量的地址给函数，可以得到实际测算值,加速度单位为g，陀螺仪单位为rad/s
+ *
  */
+
 void MPU6050_GetRealData(float *ax_real, float *ay_real, float *az_real,
                          float *gx_real, float *gy_real, float *gz_real)
 {
@@ -130,9 +132,9 @@ void MPU6050_GetRealData(float *ax_real, float *ay_real, float *az_real,
     *ay_real = (float)ay_raw / ACCEL_SENSITIVITY;
     *az_real = (float)az_raw / ACCEL_SENSITIVITY;
 
-    *gx_real = (float)gx_raw / GYRO_SENSITIVITY;
-    *gy_real = (float)gy_raw / GYRO_SENSITIVITY;
-    *gz_real = (float)gz_raw / GYRO_SENSITIVITY;
+    *gx_real = (float)gx_raw * M_PI/ 180.0f / GYRO_SENSITIVITY;
+    *gy_real = (float)gy_raw * M_PI/ 180.0f / GYRO_SENSITIVITY;
+    *gz_real = (float)gz_raw * M_PI/ 180.0f / GYRO_SENSITIVITY;
 }
 
 /* 获取设备ID（正常返回0x68） */
