@@ -36,7 +36,7 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="dd75aab8-2aa1-4115-870b-fea901077763" name="更改" comment="IMU的DMA版本驱动，无明显bug，加了点注释" />
+    <list default="true" id="dd75aab8-2aa1-4115-870b-fea901077763" name="更改" comment="配置内容" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -1682,7 +1682,7 @@
       <workItem from="1770811988623" duration="1961000" />
       <workItem from="1770950062722" duration="8424000" />
       <workItem from="1770971630849" duration="2004000" />
-      <workItem from="1770977004787" duration="7396000" />
+      <workItem from="1770977004787" duration="8200000" />
     </task>
     <task id="LOCAL-00001" summary="新建工程">
       <option name="closed" value="true" />
@@ -1780,7 +1780,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770984211371</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="配置内容">
+      <option name="closed" value="true" />
+      <created>1770985232888</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1770985232888</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -1830,7 +1838,8 @@
     <MESSAGE value="IMU的DMA版本。测试时通信存在问题" />
     <MESSAGE value="IMU的DMA版本驱动，无明显bug" />
     <MESSAGE value="IMU的DMA版本驱动，无明显bug，加了点注释" />
-    <option name="LAST_COMMIT_MESSAGE" value="IMU的DMA版本驱动，无明显bug，加了点注释" />
+    <MESSAGE value="配置内容" />
+    <option name="LAST_COMMIT_MESSAGE" value="配置内容" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

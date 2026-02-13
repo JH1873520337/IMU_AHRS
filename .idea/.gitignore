@@ -1,16 +1,18 @@
-# 默认忽略的文件
-/shelf/
-/workspace.xml
-# 基于编辑器的 HTTP 客户端请求
-/httpRequests/
-# Datasource local storage ignored files
-/dataSources/
-/dataSources.local.xml
-/debugServers/Config.xml
-/debugServers/ST_LINK.xml
-/.gitignore
-/editor.xml
-/IMU_AHRS.iml
-/misc.xml
-/modules.xml
-/vcs.xml
+# ===================== 本地个性化配置（团队无需共享，必忽略） =====================
+# 工作区配置（本地窗口布局、断点、最近文件等）
+workspace.xml
+# 调试服务器配置（本地 ST-Link/JLink 路径、调试参数）
+debugServers/
+# 编辑器个性化配置（本地字体、快捷键、编码等）
+editor.xml
+# 杂项本地配置（换行、编码等，若团队需统一可取消忽略）
+misc.xml
+# 版本控制本地路径（本地 Git 仓库路径，无需共享）
+vcs.xml
+
+# ===================== 团队共享配置（保留，无需忽略） =====================
+# 项目模块定义（团队统一模块结构，必须保留）
+!IMU_AHRS.iml
+!modules.xml
+# .idea 目录下的 .gitignore 自身（必须保留）
+!.gitignore
