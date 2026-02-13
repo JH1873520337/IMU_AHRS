@@ -84,7 +84,7 @@ uint8_t QMC5883_ParseData(float *mx_real, float *my_real, float *mz_real)
         // 2. 转换为真实值 (Gauss)
         *mx_real = (float)raw_x / MAG_SENSITIVITY;
         *my_real = (float)raw_y / MAG_SENSITIVITY;
-        *mz_real = (float)raw_z / MAG_SENSITIVITY;
+        *mz_real = (float)raw_z / MAG_SENSITIVITY; //单位为G
 
         // 3. 清除标志位，防止重复读取同一帧数据
         qmc5883_i2c_rx_done = 0;

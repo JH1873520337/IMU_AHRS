@@ -10,19 +10,19 @@ volatile uint8_t mpu6050_i2c_rx_done = 0;
 static void MPU6050_WriteByte_Block(uint8_t RegAddress, uint8_t Data)
 {
     // 使用阻塞式 API 确保初始化指令稳定执行
-    HAL_I2C_Mem_Write(MPU6050_I2C_HANDLE, MPU6050_I2C_ADDR, RegAddress,
+    HAL_I2C_Mem_Write(MPU6050_I2C_HANDLE, MPU6050_I2C_ADDR_W , RegAddress,
                       I2C_MEMADD_SIZE_8BIT, &Data, 1, 100);
 }
 
 HAL_StatusTypeDef MPU6050_ReadByte(uint8_t RegAddress, uint8_t* Data)
 {
     // 1. 发送要读取的寄存器地址
-    HAL_StatusTypeDef status = HAL_I2C_Master_Transmit(MPU6050_I2C_HANDLE, MPU6050_W_ADDRESS,
+    HAL_StatusTypeDef status = HAL_I2C_Master_Transmit(MPU6050_I2C_HANDLE, MPU6050_I2C_ADDR_W,
                                                        &RegAddress, 1, 100);
     if(status != HAL_OK) return status;
 
     // 2. 读取该寄存器的数据
-    return HAL_I2C_Master_Receive(MPU6050_I2C_HANDLE, MPU6050_R_ADDRESS,
+    return HAL_I2C_Master_Receive(MPU6050_I2C_HANDLE, MPU6050_I2C_ADDR_R,
                                   Data, 1, 100);
 }
 
@@ -70,7 +70,7 @@ void MPU6050_RequestData(void)
 
     // 使用 Mem_Read_DMA，一次读出14字节 (0x3B开始)
     // 此时 buffer 里的数据还是旧的，直到中断发生
-    HAL_I2C_Mem_Read_DMA(MPU6050_I2C_HANDLE, MPU6050_I2C_ADDR, MPU6050_ACCEL_XOUT_H,
+    HAL_I2C_Mem_Read_DMA(MPU6050_I2C_HANDLE, MPU6050_I2C_ADDR_W, MPU6050_ACCEL_XOUT_H,
                          I2C_MEMADD_SIZE_8BIT, mpu6050_buffer, 14);
 }
 
@@ -91,7 +91,7 @@ void MPU6050_ParseData(float *ax, float *ay, float *az, float *gx, float *gy, fl
     GyroZ = (int16_t)((mpu6050_buffer[12] << 8) | mpu6050_buffer[13]);
 
     // 物理量转换
-    *ax = (float)AccX / ACCEL_SENSITIVITY;
+    *ax = (float)AccX / ACCEL_SENSITIVITY;//g
     *ay = (float)AccY / ACCEL_SENSITIVITY;
     *az = (float)AccZ / ACCEL_SENSITIVITY;
 

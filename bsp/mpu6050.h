@@ -7,9 +7,10 @@
 /* 根据硬件选择 I2C */
 extern I2C_HandleTypeDef hi2c2;
 #define MPU6050_I2C_HANDLE    &hi2c2
-#define MPU6050_I2C_ADDR      (0x68 << 1) // HAL库使用左移后的地址
-#define MPU6050_W_ADDRESS     0xD0  // 写地址
-#define MPU6050_R_ADDRESS     0xD1  // 读地址
+#define MPU6050_I2C_ADDR_BASE  0x68
+#define MPU6050_I2C_ADDR_W     (MPU6050_I2C_ADDR_BASE << 1)
+#define MPU6050_I2C_ADDR_R     (MPU6050_I2C_ADDR_BASE << 1 | 0x01)
+
 /* MPU6050 寄存器地址 */
 #define MPU6050_SMPLRT_DIV    0x19
 #define MPU6050_CONFIG        0x1A
