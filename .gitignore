@@ -71,3 +71,6 @@ STLinkLog.*
 # 保留自定义脚本/文档（按需添加，示例）
 !scripts/
 !docs/
+
+
+compile_commands.json

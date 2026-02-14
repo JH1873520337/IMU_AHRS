@@ -1,5 +1,0 @@
-C:\ST\STM32CubeCLT_1.18.0\CMake\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/ST/STM32CubeCLT_1.18.0/Ninja/bin/ninja.exe -DCMAKE_C_COMPILER=C:/ST/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gcc.exe -DCMAKE_CXX_COMPILER=C:/ST/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-g++.exe -G Ninja -S E:\STM32\IMU_AHRS -B E:\STM32\IMU_AHRS\cmake-build-debug-stm32
-Build type: Debug
--- Configuring done (1.1s)
--- Generating done (0.0s)
--- Build files have been written to: E:/STM32/IMU_AHRS/cmake-build-debug-stm32
