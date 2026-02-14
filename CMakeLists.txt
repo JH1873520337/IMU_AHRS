@@ -46,7 +46,9 @@ add_executable(${CMAKE_PROJECT_NAME}
         bsp/QMC5883.c
         bsp/QMC5883.h
         APP/quaternion.c
-        APP/quaternion.h)
+        APP/quaternion.h
+        middleware/ahrs_mw.c
+        middleware/ahrs_mw.h)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -66,6 +68,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
         # 新增：添加项目根目录下的bsp头文件目录，解决头文件找不到的问题
         ${CMAKE_SOURCE_DIR}/bsp
         ${CMAKE_SOURCE_DIR}/APP
+        ${CMAKE_SOURCE_DIR}/middleware
 )
 
 # Add project symbols (macros)
