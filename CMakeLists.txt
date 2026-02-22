@@ -48,7 +48,11 @@ add_executable(${CMAKE_PROJECT_NAME}
         APP/quaternion.c
         APP/quaternion.h
         middleware/ahrs_mw.c
-        middleware/ahrs_mw.h)
+        middleware/ahrs_mw.h
+        bsp/drv_uart1.c
+        bsp/drv_uart1.h
+        middleware/telemetry.c
+        middleware/telemetry.h)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)

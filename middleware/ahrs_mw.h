@@ -9,24 +9,40 @@
 
 // ============== 传感器数据结构 ==============
 typedef struct {
-    float ax, ay, az;   // 加速度 (g)
-    float gx, gy, gz;   // 角速度 (rad/s)
-    float mx, my, mz;   // 磁场 (Gauss)
+    // 加速度计数据 (单位: g)
+    float ax;
+    float ay;
+    float az;
 
-    uint8_t acc_valid;  // 加速度数据有效标志
-    uint8_t gyro_valid; // 陀螺仪数据有效标志
-    uint8_t mag_valid;  // 磁力计数据有效标志
+    // 陀螺仪数据 (单位: rad/s)
+    float gx;
+    float gy;
+    float gz;
+
+    // 磁力计数据 (单位: Gauss)
+    float mx;
+    float my;
+    float mz;
+
+    // 数据有效标志位 (1=有效, 0=无效)
+    uint8_t acc_valid;
+    uint8_t gyro_valid;
+    uint8_t mag_valid;
+
 } IMU_Data_t;
 
 // ============== 函数声明 ==============
 
 /**
- * @brief 初始化所有传感器
+ * @brief 初始化所有传感器 (MPU6050 + QMC5883)
+ * @note  函数内部包含【陀螺仪零偏校准】。
+ *        !!! 上电后的前 1-2 秒请务必保持模块静止 !!!
  */
 void AHRS_MW_Init(void);
 
 /**
- * @brief 发起传感器数据DMA读取请求
+ * @brief 发起传感器数据 DMA 读取请求
+ * @note  非阻塞，调用后需等待数据就绪
  */
 void AHRS_MW_RequestData(void);
 
@@ -37,9 +53,9 @@ void AHRS_MW_RequestData(void);
 uint8_t AHRS_MW_IsDataReady(void);
 
 /**
- * @brief 获取传感器数据（解析DMA缓冲区）
+ * @brief 获取传感器数据（解析 DMA 缓冲区并扣除零偏）
  * @param data 输出数据结构体指针
- * @return 1=成功, 0=数据未就绪
+ * @return 1=成功获取, 0=数据未就绪
  */
 uint8_t AHRS_MW_GetData(IMU_Data_t *data);
 

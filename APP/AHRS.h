@@ -9,8 +9,8 @@
 #include "ahrs_mw.h"
 
 // ============== 算法参数 ==============
-#define MAHONY_KP       1.0f
-#define MAHONY_KI       0.0f
+#define MAHONY_KP       2.5f
+#define MAHONY_KI       0.02f
 
 // ============== AHRS 状态结构体 ==============
 typedef struct {

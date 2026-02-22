@@ -21,19 +21,21 @@
 #include "dma.h"
 #include "i2c.h"
 #include "tim.h"
+#include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "AHRS.h"
+#include "ahrs_mw.h"
+#include "telemetry.h"
 #include "OLED.h"
-#include "mpu6050.h"
-#include "QMC5883.h"
 #include "quaternion.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+#define RAD_TO_DEG 57.2957795f
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -49,9 +51,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint8_t mag_divider = 0;
-#define MAG_DIV_RATIO 4  // MPU读4次，MAG读1次
-
+AHRS_State_t ahrs;
+IMU_Data_t imu_data;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,7 +74,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  int8_t qmc_id,mpu_id;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -99,26 +100,21 @@ int main(void)
   MX_I2C2_Init();
   MX_I2C3_Init();
   MX_TIM6_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  OLED_Init();                    // 初始化OLED
-  HAL_TIM_Base_Start_IT(&htim6);
+  OLED_Init();
+  AHRS_MW_Init(); // 初始化传感器
+  AHRS_Init(&ahrs); // 初始化算法
 
-  MPU6050_Init();
-  QMC5883_Init();
+  OLED_ShowString(1, 1, "AHRS Ready");
+  float dt = 0.01f; // 10ms = 100Hz
+  uint32_t last_tick = 0;
 
-  // 变量定义
-  float ax, ay, az, gx, gy, gz;
-  float mx, my, mz;
-  qmc_id = QMC5883_GetID();
-  mpu_id = MPU6050_GetID();
-  // 状态标志
-  uint8_t mpu_requested = 0;
-  uint8_t mag_requested = 0;
 
-  // 启动第一次请求
-  MPU6050_RequestData();
-  mpu_requested = 1;
+  // 初始化后立即发一次
+  uint8_t test[] = "DMA TEST\r\n";
+  HAL_UART_Transmit_DMA(&huart1, test, sizeof(test));
 
   /* USER CODE END 2 */
 
@@ -126,60 +122,43 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    // === 任务1: 处理 MPU6050 (优先级高) ===
-    if (mpu_requested && mpu6050_i2c_rx_done)
+    HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9); // 假设这是你的LED
+    HAL_Delay(10);
+    // --- 100Hz 频率控制 ---
+    if (HAL_GetTick() - last_tick >= 10)
     {
-      MPU6050_ParseData(&ax, &ay, &az, &gx, &gy, &gz);
-      mpu_requested = 0; // 标记处理完成
+      last_tick = HAL_GetTick();
 
-      // 在这里进行姿态解算 (IMU Update)
-      // MahonyAHRSupdateIMU(...)
+      // 1. 发起传感器读取 (DMA)
+      AHRS_MW_RequestData();
 
-      // 显示数据 (仅调试用，飞行时不要每圈都刷屏)
-      OLED_ShowFloat(1, 1, az, 1, 2);
-      OLED_ShowHexNum(4,1,mpu_id, 2);
-      // === 调度逻辑 ===
-      // 准备下一次读取
-      // 这里可以加入简单的延时控制循环频率，或者使用定时器中断标志来触发
-      HAL_Delay(2);
+      // 简单延时等待DMA完成 (实际项目可用标志位优化)
+      // MPU6050读取约需 0.5ms，这里给一点余量或轮询标志位
+      while(!AHRS_MW_IsDataReady()) {}
 
-      // 决定是否读取磁力计 (分频处理)
-      mag_divider++;
-      if (mag_divider >= MAG_DIV_RATIO) {
-        if (mag_requested == 0) { // 只有上一次已经读完了才发新请求
-          QMC5883_RequestData();
-          mag_requested = 1;
-        }
-        mag_divider = 0;
+      // 2. 获取数据并解算
+      if (AHRS_MW_GetData(&imu_data))
+      {
+        // 运行 Mahony 算法
+        AHRS_Update(&ahrs, &imu_data, dt);
+
+        // 计算欧拉角 (得到的是弧度)
+        AHRS_GetEuler(&ahrs);
+
+        // 3. 发送到 Vofa+ (转换为角度)
+        // 通道顺序: 0:Roll, 1:Pitch, 2:Yaw
+        Telemetry_SendAttitude(
+            ahrs.roll * RAD_TO_DEG,
+            ahrs.pitch * RAD_TO_DEG,
+            ahrs.yaw * RAD_TO_DEG
+        );
+
+        // (可选) OLED 显示调试
+        OLED_ShowFloat(2, 1, ahrs.roll * RAD_TO_DEG, 3, 1);
+        OLED_ShowFloat(3, 1, ahrs.pitch * RAD_TO_DEG, 3, 1);
+        OLED_ShowFloat(4, 1, ahrs.yaw* RAD_TO_DEG, 3, 1);
       }
-
-      // 再次发起 MPU 读取 (高频连续)
-      MPU6050_RequestData();
-      mpu_requested = 1;
     }
-
-    // === 任务2: 处理 QMC5883 (优先级低) ===
-    // 注意：这里是并行的。I2C3 和 I2C2 的数据传输互不干扰
-    if (mag_requested && qmc5883_i2c_rx_done)
-    {
-      QMC5883_ParseData(&mx, &my, &mz);
-
-      // 处理数据 (打印或给 AHRS)
-      // printf("Mag: %d, %d, %d\n", mx, my, mz);
-
-      // === 重点 ===
-      // 不要马上死循环狂发请求，控制一下频率
-      // 或者在这里简单延时，或者用定时器标志
-      HAL_Delay(10); // 例如 100Hz 采样
-
-      // 发起下一次请求
-      QMC5883_RequestData();
-      OLED_ShowFloat(2,1, mx, 1, 2);
-      OLED_ShowHexNum(3,1,qmc_id, 2);
-    }
-
-    // === 任务3: 其他逻辑 ===
-    // 这里依然是非阻塞的！
   }
     /* USER CODE END WHILE */
 
