@@ -110,10 +110,14 @@ int main(void)
   AHRS_MW_Init(); // 初始化传感器
   AHRS_Init(&ahrs); // 初始化算法
 
-  OLED_ShowString(1, 1, "M00000 00000 0");
-  OLED_ShowString(2, 1, "Q00000 00000 0");
-  OLED_ShowString(3, 1, "T00000 U00000");
-  OLED_ShowString(4, 1, "S00 I0 F0 L0000");
+  uint8_t mpu_id = MPU6050_GetID();
+  uint8_t qmc_id = QMC5883_GetID();
+  uint8_t oled_page = 0;
+
+  OLED_ShowString(1, 1, "M00 Q00 A0G0M0");
+  OLED_ShowString(2, 1, "AX+0.00");
+  OLED_ShowString(3, 1, "AY+0.00");
+  OLED_ShowString(4, 1, "AZ+0.00");
   {
     uint8_t boot_msg[] = "VOFA START\r\n";
     HAL_UART_Transmit(&huart1, boot_msg, sizeof(boot_msg) - 1U, 100U);
@@ -123,6 +127,7 @@ int main(void)
   uint32_t last_data_tick = imu_tick;
   uint32_t last_req_tick = imu_tick;
   uint32_t last_oled_tick = imu_tick;
+  uint32_t last_page_tick = imu_tick;
   uint32_t last_noimu_uart_tick = imu_tick;
   uint32_t imu_frame_cnt = 0;
   uint32_t imu_fail_cnt = 0;
@@ -141,6 +146,16 @@ int main(void)
 
     I2C_ServiceRecover();
     now = HAL_GetTick();
+
+    if ((now - last_page_tick) >= 1500U)
+    {
+      oled_page++;
+      if (oled_page >= 3U)
+      {
+        oled_page = 0;
+      }
+      last_page_tick = now;
+    }
 
     if (!AHRS_MW_IsDataReady())
     {
@@ -203,47 +218,40 @@ int main(void)
 
     if ((now - last_oled_tick) >= 100U)
     {
-      uint32_t mpu_req = 0;
-      uint32_t mpu_ok = 0;
-      uint32_t mpu_err = 0;
-      uint32_t mpu_last = 0;
-      uint32_t qmc_req = 0;
-      uint32_t qmc_ok = 0;
-      uint32_t qmc_err = 0;
-      uint32_t qmc_last = 0;
-      uint32_t tel_att = 0;
-      uint32_t tel_sensor = 0;
-      uint32_t tx_req = 0;
-      uint32_t tx_start = 0;
-      uint32_t tx_drop = 0;
-      uint32_t data_lag = now - last_data_tick;
+      OLED_ShowString(1, 1, "M00 Q00 A0G0M0");
+      OLED_ShowHexNum(1, 2, mpu_id, 2);
+      OLED_ShowHexNum(1, 6, qmc_id, 2);
+      OLED_ShowNum(1, 11, imu_data.acc_valid, 1);
+      OLED_ShowNum(1, 13, imu_data.gyro_valid, 1);
+      OLED_ShowNum(1, 15, imu_data.mag_valid, 1);
 
-      if (data_lag > 99999U)
+      if (oled_page == 0U)
       {
-        data_lag = 99999U;
+        OLED_ShowString(2, 1, "AX+0.00");
+        OLED_ShowString(3, 1, "AY+0.00");
+        OLED_ShowString(4, 1, "AZ+0.00");
+        OLED_ShowFloat(2, 3, imu_data.ax, 1, 2);
+        OLED_ShowFloat(3, 3, imu_data.ay, 1, 2);
+        OLED_ShowFloat(4, 3, imu_data.az, 1, 2);
       }
-
-      MPU6050_GetRequestStats(&mpu_req, &mpu_ok, &mpu_err, &mpu_last);
-      QMC5883_GetRequestStats(&qmc_req, &qmc_ok, &qmc_err, &qmc_last);
-      Telemetry_GetStats(&tel_att, &tel_sensor);
-      Drv_UART_GetStats(&tx_req, &tx_start, &tx_drop);
-
-      OLED_ShowNum(1, 2, mpu_req % 100000U, 5);
-      OLED_ShowNum(1, 8, mpu_ok % 100000U, 5);
-      OLED_ShowHexNum(1, 14, mpu_last & 0x0FU, 1);
-
-      OLED_ShowNum(2, 2, qmc_req % 100000U, 5);
-      OLED_ShowNum(2, 8, qmc_ok % 100000U, 5);
-      OLED_ShowHexNum(2, 14, qmc_last & 0x0FU, 1);
-
-      OLED_ShowNum(3, 2, tel_att % 100000U, 5);
-      OLED_ShowNum(3, 9, tx_start % 100000U, 5);
-
-      OLED_ShowHexNum(4, 2, (uint32_t)huart1.gState, 2);
-      OLED_ShowNum(4, 5, AHRS_MW_IsDataReady(), 1);
-      OLED_ShowNum(4, 8, imu_fail_cnt % 10U, 1);
-      OLED_ShowNum(4, 11, imu_data.mag_valid, 1);
-      OLED_ShowNum(4, 13, data_lag % 10000U, 4);
+      else if (oled_page == 1U)
+      {
+        OLED_ShowString(2, 1, "GX+00.0");
+        OLED_ShowString(3, 1, "GY+00.0");
+        OLED_ShowString(4, 1, "GZ+00.0");
+        OLED_ShowFloat(2, 3, imu_data.gx * RAD_TO_DEG, 2, 1);
+        OLED_ShowFloat(3, 3, imu_data.gy * RAD_TO_DEG, 2, 1);
+        OLED_ShowFloat(4, 3, imu_data.gz * RAD_TO_DEG, 2, 1);
+      }
+      else
+      {
+        OLED_ShowString(2, 1, "MX+0.00");
+        OLED_ShowString(3, 1, "MY+0.00");
+        OLED_ShowString(4, 1, "MZ+0.00");
+        OLED_ShowFloat(2, 3, imu_data.mx, 1, 2);
+        OLED_ShowFloat(3, 3, imu_data.my, 1, 2);
+        OLED_ShowFloat(4, 3, imu_data.mz, 1, 2);
+      }
 
       last_oled_tick = now;
     }
