@@ -29,6 +29,7 @@
 #include "AHRS.h"
 #include "ahrs_mw.h"
 #include "telemetry.h"
+#include "drv_uart1.h"
 #include "OLED.h"
 #include "quaternion.h"
 /* USER CODE END Includes */
@@ -107,13 +108,18 @@ int main(void)
   AHRS_MW_Init(); // 初始化传感器
   AHRS_Init(&ahrs); // 初始化算法
 
-  OLED_ShowString(1, 1, "AHRS Ready");
+  OLED_ShowString(1, 1, "I00000 T00000");
+  OLED_ShowString(2, 1, "Q00000 D00000");
+  OLED_ShowString(3, 1, "U00 M00 Q00");
+  OLED_ShowString(4, 1, "L00000 A0G0M0");
   {
     uint8_t boot_msg[] = "VOFA START\r\n";
     HAL_UART_Transmit(&huart1, boot_msg, sizeof(boot_msg) - 1U, 100U);
   }
 
   uint32_t imu_tick = HAL_GetTick();
+  uint32_t last_data_tick = imu_tick;
+  uint32_t imu_frame_cnt = 0;
   uint16_t telemetry_div = 0;
   uint16_t oled_div = 0;
   uint16_t led_div = 0;
@@ -147,6 +153,9 @@ int main(void)
 
       if (AHRS_MW_GetData(&imu_data))
       {
+        imu_frame_cnt++;
+        last_data_tick = now;
+
         AHRS_Update(&ahrs, &imu_data, dt);
         AHRS_GetEuler(&ahrs);
 
@@ -166,10 +175,34 @@ int main(void)
 
         if (oled_div >= 50U)
         {
+          uint32_t tx_req = 0;
+          uint32_t tx_start = 0;
+          uint32_t tx_drop = 0;
+          uint32_t data_lag = now - last_data_tick;
+
           oled_div = 0;
-          OLED_ShowFloat(2, 1, ahrs.roll * RAD_TO_DEG, 3, 1);
-          OLED_ShowFloat(3, 1, ahrs.pitch * RAD_TO_DEG, 3, 1);
-          OLED_ShowFloat(4, 1, ahrs.yaw * RAD_TO_DEG, 3, 1);
+
+          if (data_lag > 99999U)
+          {
+            data_lag = 99999U;
+          }
+
+          Drv_UART_GetStats(&tx_req, &tx_start, &tx_drop);
+
+          OLED_ShowNum(1, 2, imu_frame_cnt % 100000U, 5);
+          OLED_ShowNum(1, 9, tx_start % 100000U, 5);
+
+          OLED_ShowNum(2, 2, tx_req % 100000U, 5);
+          OLED_ShowNum(2, 9, tx_drop % 100000U, 5);
+
+          OLED_ShowHexNum(3, 2, (uint32_t)huart1.gState, 2);
+          OLED_ShowHexNum(3, 6, (uint32_t)HAL_I2C_GetState(&hi2c2), 2);
+          OLED_ShowHexNum(3, 10, (uint32_t)HAL_I2C_GetState(&hi2c3), 2);
+
+          OLED_ShowNum(4, 2, data_lag, 5);
+          OLED_ShowNum(4, 9, imu_data.acc_valid, 1);
+          OLED_ShowNum(4, 11, imu_data.gyro_valid, 1);
+          OLED_ShowNum(4, 13, imu_data.mag_valid, 1);
         }
 
         if (led_div >= 250U)

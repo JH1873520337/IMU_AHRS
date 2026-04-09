@@ -22,4 +22,6 @@ void Drv_UART_Init(void);
  */
 void Drv_UART_Transmit_DMA(uint8_t *data, uint16_t len);
 
+void Drv_UART_GetStats(uint32_t *req, uint32_t *start, uint32_t *drop);
+
 #endif //DRV_UART1_H
