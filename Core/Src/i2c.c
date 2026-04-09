@@ -24,7 +24,9 @@
 #include "mpu6050.h"  // 包含MPU的标志位
 #include "QMC5883.h"  // 包含QMC的标志位
 
-/* USER CODE BEGIN 0 */
+static volatile uint8_t i2c2_recover_req = 0;
+static volatile uint8_t i2c3_recover_req = 0;
+
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
   if (hi2c->Instance == I2C2) {         // MPU6050
@@ -46,13 +48,39 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
 {
-  // 发生错误自动重置
-  HAL_I2C_DeInit(hi2c);
-  HAL_Delay(5);
   if (hi2c->Instance == I2C2) {
-    MX_I2C2_Init();
+    mpu6050_i2c_rx_done = 0;
+    i2c2_recover_req = 1;
   } else if (hi2c->Instance == I2C3) {
+    qmc5883_i2c_rx_done = 0;
+    i2c3_recover_req = 1;
+  }
+}
+
+void I2C_ServiceRecover(void)
+{
+  static uint32_t last_recover_tick = 0;
+  uint32_t now = HAL_GetTick();
+
+  if ((now - last_recover_tick) < 2U)
+  {
+    return;
+  }
+
+  if (i2c2_recover_req)
+  {
+    HAL_I2C_DeInit(&hi2c2);
+    MX_I2C2_Init();
+    i2c2_recover_req = 0;
+    last_recover_tick = now;
+  }
+
+  if (i2c3_recover_req)
+  {
+    HAL_I2C_DeInit(&hi2c3);
     MX_I2C3_Init();
+    i2c3_recover_req = 0;
+    last_recover_tick = now;
   }
 }
 /* USER CODE END 0 */

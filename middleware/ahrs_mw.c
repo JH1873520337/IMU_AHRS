@@ -9,6 +9,7 @@ static float acc_offset[3] = {0.0f, 0.0f, 0.0f};
 static float mag_offset[3] = {0.0f, 0.0f, 0.0f};
 
 static uint16_t still_counter = 0;
+static uint8_t mag_request_div = 0;
 
 #define STARTUP_CALIB_SAMPLES      1200
 #define GYRO_RUNTIME_BIAS_ALPHA    0.0025f
@@ -97,9 +98,15 @@ void AHRS_MW_RequestData(void)
         MPU6050_RequestData();
     }
 
-    if (HAL_I2C_GetState(QMC5883_I2C_HANDLE) == HAL_I2C_STATE_READY)
+    mag_request_div++;
+    if (mag_request_div >= 5U)
     {
-        QMC5883_RequestData();
+        mag_request_div = 0;
+
+        if (HAL_I2C_GetState(QMC5883_I2C_HANDLE) == HAL_I2C_STATE_READY)
+        {
+            QMC5883_RequestData();
+        }
     }
 }
 

@@ -108,10 +108,15 @@ int main(void)
   AHRS_Init(&ahrs); // 初始化算法
 
   OLED_ShowString(1, 1, "AHRS Ready");
+  {
+    uint8_t boot_msg[] = "VOFA START\r\n";
+    HAL_UART_Transmit(&huart1, boot_msg, sizeof(boot_msg) - 1U, 100U);
+  }
+
   uint32_t imu_tick = HAL_GetTick();
-  uint32_t telemetry_tick = imu_tick;
-  uint32_t oled_tick = imu_tick;
-  uint32_t led_tick = imu_tick;
+  uint16_t telemetry_div = 0;
+  uint16_t oled_div = 0;
+  uint16_t led_div = 0;
 
   AHRS_MW_RequestData();
 
@@ -121,7 +126,10 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    uint32_t now = HAL_GetTick();
+    uint32_t now;
+
+    I2C_ServiceRecover();
+    now = HAL_GetTick();
 
     if (AHRS_MW_IsDataReady())
     {
@@ -141,33 +149,37 @@ int main(void)
       {
         AHRS_Update(&ahrs, &imu_data, dt);
         AHRS_GetEuler(&ahrs);
+
+        telemetry_div++;
+        oled_div++;
+        led_div++;
+
+        if (telemetry_div >= 10U)
+        {
+          telemetry_div = 0;
+          Telemetry_SendAttitude(
+              ahrs.roll * RAD_TO_DEG,
+              ahrs.pitch * RAD_TO_DEG,
+              ahrs.yaw * RAD_TO_DEG
+          );
+        }
+
+        if (oled_div >= 50U)
+        {
+          oled_div = 0;
+          OLED_ShowFloat(2, 1, ahrs.roll * RAD_TO_DEG, 3, 1);
+          OLED_ShowFloat(3, 1, ahrs.pitch * RAD_TO_DEG, 3, 1);
+          OLED_ShowFloat(4, 1, ahrs.yaw * RAD_TO_DEG, 3, 1);
+        }
+
+        if (led_div >= 250U)
+        {
+          led_div = 0;
+          HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9);
+        }
       }
 
       AHRS_MW_RequestData();
-    }
-
-    if ((now - telemetry_tick) >= 10U)
-    {
-      telemetry_tick = now;
-      Telemetry_SendAttitude(
-          ahrs.roll * RAD_TO_DEG,
-          ahrs.pitch * RAD_TO_DEG,
-          ahrs.yaw * RAD_TO_DEG
-      );
-    }
-
-    if ((now - oled_tick) >= 50U)
-    {
-      oled_tick = now;
-      OLED_ShowFloat(2, 1, ahrs.roll * RAD_TO_DEG, 3, 1);
-      OLED_ShowFloat(3, 1, ahrs.pitch * RAD_TO_DEG, 3, 1);
-      OLED_ShowFloat(4, 1, ahrs.yaw * RAD_TO_DEG, 3, 1);
-    }
-
-    if ((now - led_tick) >= 250U)
-    {
-      led_tick = now;
-      HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9);
     }
   }
     /* USER CODE END WHILE */
