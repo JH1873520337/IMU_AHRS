@@ -8,9 +8,13 @@
 
 // Vofa+ JustFloat 帧尾: 00 00 80 7f
 static const uint8_t tail[4] = {0x00, 0x00, 0x80, 0x7f};
+static uint32_t telemetry_attitude_calls = 0;
+static uint32_t telemetry_sensor_calls = 0;
 
 void Telemetry_SendAttitude(float roll, float pitch, float yaw)
 {
+    telemetry_attitude_calls++;
+
     // 缓冲区: 3个float (12字节) + 帧尾 (4字节)
     static uint8_t tx_buf[16];
 
@@ -28,6 +32,8 @@ void Telemetry_SendAttitude(float roll, float pitch, float yaw)
 
 void Telemetry_SendSensors(float ax, float ay, float az, float gx, float gy, float gz)
 {
+    telemetry_sensor_calls++;
+
     // 6个float + 帧尾 = 28字节
     static uint8_t tx_buf[28];
 
@@ -40,4 +46,16 @@ void Telemetry_SendSensors(float ax, float ay, float az, float gx, float gy, flo
     memcpy(&tx_buf[24], tail, 4);
 
     Drv_UART_Transmit_DMA(tx_buf, 28);
+}
+
+void Telemetry_GetStats(uint32_t *attitude_calls, uint32_t *sensor_calls)
+{
+    if (attitude_calls != 0)
+    {
+        *attitude_calls = telemetry_attitude_calls;
+    }
+    if (sensor_calls != 0)
+    {
+        *sensor_calls = telemetry_sensor_calls;
+    }
 }

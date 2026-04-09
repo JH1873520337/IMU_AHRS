@@ -5,6 +5,10 @@
 static uint8_t qmc_dma_buffer[6];
 // 完成标志位
 volatile uint8_t qmc5883_i2c_rx_done = 0;
+volatile uint32_t qmc5883_req_count = 0;
+volatile uint32_t qmc5883_req_ok_count = 0;
+volatile uint32_t qmc5883_req_err_count = 0;
+volatile uint32_t qmc5883_last_req_status = 0;
 
 /* ============================================================
    保留部分：辅助函数（用于初始化和阻塞读ID）
@@ -57,6 +61,9 @@ void QMC5883_Init(void)
  */
 void QMC5883_RequestData(void)
 {
+    HAL_StatusTypeDef status;
+
+    qmc5883_req_count++;
     qmc5883_i2c_rx_done = 0; // 清除标志
 
     // 参数说明：
@@ -66,9 +73,39 @@ void QMC5883_RequestData(void)
     // 4. 寄存器地址长度 (8bit)
     // 5. 数据缓冲区
     // 6. 数据长度 (6字节)
-    HAL_I2C_Mem_Read_DMA(QMC5883_I2C_HANDLE, QMC5883_W_ADDRESS,
-                         QMC5883_DataOut_XLSB, I2C_MEMADD_SIZE_8BIT,
-                         qmc_dma_buffer, 6);
+    status = HAL_I2C_Mem_Read_DMA(QMC5883_I2C_HANDLE, QMC5883_W_ADDRESS,
+                                  QMC5883_DataOut_XLSB, I2C_MEMADD_SIZE_8BIT,
+                                  qmc_dma_buffer, 6);
+    qmc5883_last_req_status = (uint32_t)status;
+
+    if (status == HAL_OK)
+    {
+        qmc5883_req_ok_count++;
+    }
+    else
+    {
+        qmc5883_req_err_count++;
+    }
+}
+
+void QMC5883_GetRequestStats(uint32_t *req, uint32_t *ok, uint32_t *err, uint32_t *last_status)
+{
+    if (req != 0)
+    {
+        *req = qmc5883_req_count;
+    }
+    if (ok != 0)
+    {
+        *ok = qmc5883_req_ok_count;
+    }
+    if (err != 0)
+    {
+        *err = qmc5883_req_err_count;
+    }
+    if (last_status != 0)
+    {
+        *last_status = qmc5883_last_req_status;
+    }
 }
 
 /**

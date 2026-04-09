@@ -31,6 +31,8 @@
 #include "telemetry.h"
 #include "drv_uart1.h"
 #include "OLED.h"
+#include "mpu6050.h"
+#include "QMC5883.h"
 #include "quaternion.h"
 /* USER CODE END Includes */
 
@@ -108,10 +110,10 @@ int main(void)
   AHRS_MW_Init(); // 初始化传感器
   AHRS_Init(&ahrs); // 初始化算法
 
-  OLED_ShowString(1, 1, "I00000 T00000");
-  OLED_ShowString(2, 1, "Q00000 D00000");
-  OLED_ShowString(3, 1, "U00 M00 Q00");
-  OLED_ShowString(4, 1, "L00000 A0G0M0");
+  OLED_ShowString(1, 1, "M00000 00000 0");
+  OLED_ShowString(2, 1, "Q00000 00000 0");
+  OLED_ShowString(3, 1, "T00000 U00000");
+  OLED_ShowString(4, 1, "S00 I0 F0 L0000");
   {
     uint8_t boot_msg[] = "VOFA START\r\n";
     HAL_UART_Transmit(&huart1, boot_msg, sizeof(boot_msg) - 1U, 100U);
@@ -201,6 +203,16 @@ int main(void)
 
     if ((now - last_oled_tick) >= 100U)
     {
+      uint32_t mpu_req = 0;
+      uint32_t mpu_ok = 0;
+      uint32_t mpu_err = 0;
+      uint32_t mpu_last = 0;
+      uint32_t qmc_req = 0;
+      uint32_t qmc_ok = 0;
+      uint32_t qmc_err = 0;
+      uint32_t qmc_last = 0;
+      uint32_t tel_att = 0;
+      uint32_t tel_sensor = 0;
       uint32_t tx_req = 0;
       uint32_t tx_start = 0;
       uint32_t tx_drop = 0;
@@ -211,22 +223,27 @@ int main(void)
         data_lag = 99999U;
       }
 
+      MPU6050_GetRequestStats(&mpu_req, &mpu_ok, &mpu_err, &mpu_last);
+      QMC5883_GetRequestStats(&qmc_req, &qmc_ok, &qmc_err, &qmc_last);
+      Telemetry_GetStats(&tel_att, &tel_sensor);
       Drv_UART_GetStats(&tx_req, &tx_start, &tx_drop);
 
-      OLED_ShowNum(1, 2, imu_frame_cnt % 100000U, 5);
-      OLED_ShowNum(1, 9, tx_start % 100000U, 5);
+      OLED_ShowNum(1, 2, mpu_req % 100000U, 5);
+      OLED_ShowNum(1, 8, mpu_ok % 100000U, 5);
+      OLED_ShowHexNum(1, 14, mpu_last & 0x0FU, 1);
 
-      OLED_ShowNum(2, 2, tx_req % 100000U, 5);
-      OLED_ShowNum(2, 9, tx_drop % 100000U, 5);
+      OLED_ShowNum(2, 2, qmc_req % 100000U, 5);
+      OLED_ShowNum(2, 8, qmc_ok % 100000U, 5);
+      OLED_ShowHexNum(2, 14, qmc_last & 0x0FU, 1);
 
-      OLED_ShowHexNum(3, 2, (uint32_t)huart1.gState, 2);
-      OLED_ShowHexNum(3, 6, (uint32_t)HAL_I2C_GetState(&hi2c2), 2);
-      OLED_ShowHexNum(3, 10, (uint32_t)HAL_I2C_GetState(&hi2c3), 2);
+      OLED_ShowNum(3, 2, tel_att % 100000U, 5);
+      OLED_ShowNum(3, 9, tx_start % 100000U, 5);
 
-      OLED_ShowNum(4, 2, data_lag, 5);
-      OLED_ShowNum(4, 9, AHRS_MW_IsDataReady(), 1);
-      OLED_ShowNum(4, 11, imu_fail_cnt % 10U, 1);
-      OLED_ShowNum(4, 13, imu_data.mag_valid, 1);
+      OLED_ShowHexNum(4, 2, (uint32_t)huart1.gState, 2);
+      OLED_ShowNum(4, 5, AHRS_MW_IsDataReady(), 1);
+      OLED_ShowNum(4, 8, imu_fail_cnt % 10U, 1);
+      OLED_ShowNum(4, 11, imu_data.mag_valid, 1);
+      OLED_ShowNum(4, 13, data_lag % 10000U, 4);
 
       last_oled_tick = now;
     }

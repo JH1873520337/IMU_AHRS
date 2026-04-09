@@ -5,6 +5,10 @@
 // 接收缓冲区：Acc(6) + Temp(2) + Gyro(6) = 14 bytes
 static uint8_t mpu6050_buffer[14];
 volatile uint8_t mpu6050_i2c_rx_done = 0;
+volatile uint32_t mpu6050_req_count = 0;
+volatile uint32_t mpu6050_req_ok_count = 0;
+volatile uint32_t mpu6050_req_err_count = 0;
+volatile uint32_t mpu6050_last_req_status = 0;
 
 /* 私有函数：阻塞式写寄存器 (仅用于初始化) */
 static void MPU6050_WriteByte_Block(uint8_t RegAddress, uint8_t Data)
@@ -66,12 +70,45 @@ uint8_t MPU6050_GetID(void)
  */
 void MPU6050_RequestData(void)
 {
+    HAL_StatusTypeDef status;
+
+    mpu6050_req_count++;
     mpu6050_i2c_rx_done = 0; // 清除标志位
 
     // 使用 Mem_Read_DMA，一次读出14字节 (0x3B开始)
     // 此时 buffer 里的数据还是旧的，直到中断发生
-    HAL_I2C_Mem_Read_DMA(MPU6050_I2C_HANDLE, MPU6050_I2C_ADDR_W, MPU6050_ACCEL_XOUT_H,
-                         I2C_MEMADD_SIZE_8BIT, mpu6050_buffer, 14);
+    status = HAL_I2C_Mem_Read_DMA(MPU6050_I2C_HANDLE, MPU6050_I2C_ADDR_W, MPU6050_ACCEL_XOUT_H,
+                                  I2C_MEMADD_SIZE_8BIT, mpu6050_buffer, 14);
+    mpu6050_last_req_status = (uint32_t)status;
+
+    if (status == HAL_OK)
+    {
+        mpu6050_req_ok_count++;
+    }
+    else
+    {
+        mpu6050_req_err_count++;
+    }
+}
+
+void MPU6050_GetRequestStats(uint32_t *req, uint32_t *ok, uint32_t *err, uint32_t *last_status)
+{
+    if (req != 0)
+    {
+        *req = mpu6050_req_count;
+    }
+    if (ok != 0)
+    {
+        *ok = mpu6050_req_ok_count;
+    }
+    if (err != 0)
+    {
+        *err = mpu6050_req_err_count;
+    }
+    if (last_status != 0)
+    {
+        *last_status = mpu6050_last_req_status;
+    }
 }
 
 /**

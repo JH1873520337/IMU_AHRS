@@ -27,6 +27,10 @@ extern I2C_HandleTypeDef hi2c2;
 
 /* DMA 标志位 */
 extern volatile uint8_t mpu6050_i2c_rx_done;
+extern volatile uint32_t mpu6050_req_count;
+extern volatile uint32_t mpu6050_req_ok_count;
+extern volatile uint32_t mpu6050_req_err_count;
+extern volatile uint32_t mpu6050_last_req_status;
 
 /* 函数声明 */
 void MPU6050_Init(void); // 阻塞式初始化
@@ -35,6 +39,7 @@ uint8_t MPU6050_GetID(void);
 // === 核心数据读取函数 (DMA 非阻塞) ===
 // 1. 发起读取请求 (在主循环开始调用)
 void MPU6050_RequestData(void);
+void MPU6050_GetRequestStats(uint32_t *req, uint32_t *ok, uint32_t *err, uint32_t *last_status);
 // 2. 检查数据是否就绪 (检查 mpu6050_i2c_rx_done)
 // 3. 解析数据 (在主循环中，当 rx_done==1 时调用)
 void MPU6050_ParseData(float *ax, float *ay, float *az, float *gx, float *gy, float *gz);

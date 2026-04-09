@@ -30,6 +30,10 @@ extern I2C_HandleTypeDef hi2c3;
 
 /* --- 新增 DMA 相关变量 --- */
 extern volatile uint8_t qmc5883_i2c_rx_done; // 完成标志
+extern volatile uint32_t qmc5883_req_count;
+extern volatile uint32_t qmc5883_req_ok_count;
+extern volatile uint32_t qmc5883_req_err_count;
+extern volatile uint32_t qmc5883_last_req_status;
 
 /* --- 函数接口 --- */
 // 1. 初始化 (保持阻塞，不用变)
@@ -37,6 +41,7 @@ void QMC5883_Init(void);
 
 // 2. 发起 DMA 请求 (替代原来的 GetData 里的 I2C 部分)
 void QMC5883_RequestData(void);
+void QMC5883_GetRequestStats(uint32_t *req, uint32_t *ok, uint32_t *err, uint32_t *last_status);
 
 // 3. 解析数据 (替代原来的 GetData 里的移位拼接部分)
 // 返回 1 表示更新成功，0 表示数据未准备好
