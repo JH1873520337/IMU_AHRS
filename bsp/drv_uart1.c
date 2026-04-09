@@ -16,26 +16,20 @@ void Drv_UART_Init(void)
 
 void Drv_UART_Transmit_DMA(uint8_t *data, uint16_t len)
 {
+    HAL_StatusTypeDef status;
+
     uart_tx_req_cnt++;
 
-    // 检查串口是否忙 (防止上一帧没发完就发下一帧，导致数据覆盖)
-    // 实际工程中这里应该用环形缓冲区(RingBuffer)来缓冲，这里简化处理
-    if (huart1.gState == HAL_UART_STATE_READY)
+    // 16字节姿态帧在115200波特率下只需要约1.5ms，直接阻塞发送更稳定。
+    status = HAL_UART_Transmit(&huart1, data, len, 20U);
+    if (status == HAL_OK)
     {
-        if (HAL_UART_Transmit_DMA(&huart1, data, len) == HAL_OK)
-        {
-            uart_tx_start_cnt++;
-        }
-        else
-        {
-            uart_tx_drop_cnt++;
-        }
+        uart_tx_start_cnt++;
     }
     else
     {
         uart_tx_drop_cnt++;
     }
-    // HAL_UART_Transmit(&huart1, data, len, 10);
 }
 
 void Drv_UART_GetStats(uint32_t *req, uint32_t *start, uint32_t *drop)
