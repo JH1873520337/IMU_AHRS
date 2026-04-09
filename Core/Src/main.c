@@ -36,7 +36,7 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 #define RAD_TO_DEG 57.2957795f
-#define VOFA_SELFTEST 1
+#define VOFA_SELFTEST 0
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -118,7 +118,7 @@ int main(void)
   AHRS_MW_Init(); // 初始化传感器
   AHRS_Init(&ahrs); // 初始化算法
 
-  OLED_ShowString(1, 1, "VOFA RUN");
+  OLED_ShowString(1, 1, "RPY RUN");
 
   uint32_t imu_tick = HAL_GetTick();
   uint32_t last_req_tick = imu_tick;
