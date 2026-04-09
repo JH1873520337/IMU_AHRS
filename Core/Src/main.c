@@ -112,7 +112,7 @@ int main(void)
   uint32_t imu_tick = HAL_GetTick();
   uint32_t last_req_tick = imu_tick;
   uint32_t last_oled_tick = imu_tick;
-  uint16_t telemetry_div = 0;
+  uint32_t last_telemetry_tick = imu_tick;
   uint16_t led_div = 0;
 
   AHRS_MW_RequestData();
@@ -156,18 +156,7 @@ int main(void)
         AHRS_Update(&ahrs, &imu_data, dt);
         AHRS_GetEuler(&ahrs);
 
-        telemetry_div++;
         led_div++;
-
-        if (telemetry_div >= 10U)
-        {
-          telemetry_div = 0;
-          Telemetry_SendAttitude(
-              ahrs.roll * RAD_TO_DEG,
-              ahrs.pitch * RAD_TO_DEG,
-              ahrs.yaw * RAD_TO_DEG
-          );
-        }
 
         if (led_div >= 250U)
         {
@@ -178,6 +167,16 @@ int main(void)
 
       AHRS_MW_RequestData();
       last_req_tick = now;
+    }
+
+    if ((now - last_telemetry_tick) >= 10U)
+    {
+      last_telemetry_tick = now;
+      Telemetry_SendAttitude(
+          ahrs.roll * RAD_TO_DEG,
+          ahrs.pitch * RAD_TO_DEG,
+          ahrs.yaw * RAD_TO_DEG
+      );
     }
 
     if ((now - last_oled_tick) >= 50U)
