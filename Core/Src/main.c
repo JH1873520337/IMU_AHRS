@@ -119,9 +119,12 @@ int main(void)
 
   uint32_t imu_tick = HAL_GetTick();
   uint32_t last_data_tick = imu_tick;
+  uint32_t last_req_tick = imu_tick;
+  uint32_t last_oled_tick = imu_tick;
+  uint32_t last_noimu_uart_tick = imu_tick;
   uint32_t imu_frame_cnt = 0;
+  uint32_t imu_fail_cnt = 0;
   uint16_t telemetry_div = 0;
-  uint16_t oled_div = 0;
   uint16_t led_div = 0;
 
   AHRS_MW_RequestData();
@@ -136,6 +139,15 @@ int main(void)
 
     I2C_ServiceRecover();
     now = HAL_GetTick();
+
+    if (!AHRS_MW_IsDataReady())
+    {
+      if ((now - last_req_tick) >= 1U)
+      {
+        AHRS_MW_RequestData();
+        last_req_tick = now;
+      }
+    }
 
     if (AHRS_MW_IsDataReady())
     {
@@ -160,7 +172,6 @@ int main(void)
         AHRS_GetEuler(&ahrs);
 
         telemetry_div++;
-        oled_div++;
         led_div++;
 
         if (telemetry_div >= 10U)
@@ -173,46 +184,61 @@ int main(void)
           );
         }
 
-        if (oled_div >= 50U)
-        {
-          uint32_t tx_req = 0;
-          uint32_t tx_start = 0;
-          uint32_t tx_drop = 0;
-          uint32_t data_lag = now - last_data_tick;
-
-          oled_div = 0;
-
-          if (data_lag > 99999U)
-          {
-            data_lag = 99999U;
-          }
-
-          Drv_UART_GetStats(&tx_req, &tx_start, &tx_drop);
-
-          OLED_ShowNum(1, 2, imu_frame_cnt % 100000U, 5);
-          OLED_ShowNum(1, 9, tx_start % 100000U, 5);
-
-          OLED_ShowNum(2, 2, tx_req % 100000U, 5);
-          OLED_ShowNum(2, 9, tx_drop % 100000U, 5);
-
-          OLED_ShowHexNum(3, 2, (uint32_t)huart1.gState, 2);
-          OLED_ShowHexNum(3, 6, (uint32_t)HAL_I2C_GetState(&hi2c2), 2);
-          OLED_ShowHexNum(3, 10, (uint32_t)HAL_I2C_GetState(&hi2c3), 2);
-
-          OLED_ShowNum(4, 2, data_lag, 5);
-          OLED_ShowNum(4, 9, imu_data.acc_valid, 1);
-          OLED_ShowNum(4, 11, imu_data.gyro_valid, 1);
-          OLED_ShowNum(4, 13, imu_data.mag_valid, 1);
-        }
-
         if (led_div >= 250U)
         {
           led_div = 0;
           HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9);
         }
       }
+      else
+      {
+        imu_fail_cnt++;
+      }
 
       AHRS_MW_RequestData();
+      last_req_tick = now;
+    }
+
+    if ((now - last_oled_tick) >= 100U)
+    {
+      uint32_t tx_req = 0;
+      uint32_t tx_start = 0;
+      uint32_t tx_drop = 0;
+      uint32_t data_lag = now - last_data_tick;
+
+      if (data_lag > 99999U)
+      {
+        data_lag = 99999U;
+      }
+
+      Drv_UART_GetStats(&tx_req, &tx_start, &tx_drop);
+
+      OLED_ShowNum(1, 2, imu_frame_cnt % 100000U, 5);
+      OLED_ShowNum(1, 9, tx_start % 100000U, 5);
+
+      OLED_ShowNum(2, 2, tx_req % 100000U, 5);
+      OLED_ShowNum(2, 9, tx_drop % 100000U, 5);
+
+      OLED_ShowHexNum(3, 2, (uint32_t)huart1.gState, 2);
+      OLED_ShowHexNum(3, 6, (uint32_t)HAL_I2C_GetState(&hi2c2), 2);
+      OLED_ShowHexNum(3, 10, (uint32_t)HAL_I2C_GetState(&hi2c3), 2);
+
+      OLED_ShowNum(4, 2, data_lag, 5);
+      OLED_ShowNum(4, 9, AHRS_MW_IsDataReady(), 1);
+      OLED_ShowNum(4, 11, imu_fail_cnt % 10U, 1);
+      OLED_ShowNum(4, 13, imu_data.mag_valid, 1);
+
+      last_oled_tick = now;
+    }
+
+    if ((now - last_data_tick) > 1000U)
+    {
+      if ((now - last_noimu_uart_tick) >= 1000U)
+      {
+        uint8_t warn_msg[] = "NO IMU\r\n";
+        HAL_UART_Transmit(&huart1, warn_msg, sizeof(warn_msg) - 1U, 50U);
+        last_noimu_uart_tick = now;
+      }
     }
   }
     /* USER CODE END WHILE */
