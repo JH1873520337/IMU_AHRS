@@ -38,11 +38,16 @@ void QMC5883_Init(void)
 {
     HAL_Delay(100); // 上电延时
 
-    // 你原来的配置值
-    QMC5883_WriteByte(QMC5883_Control_Registers1, 0X0B);
-    HAL_Delay(10);
+    // 按数据手册推荐: 先配置轴符号、量程和连续模式
+    QMC5883_WriteByte(QMC5883_Axis_Sign, 0x06);
+    HAL_Delay(2);
 
-    QMC5883_WriteByte(QMC5883_Control_Registers2, 0X08);
+    // ±8G, 使能set/reset
+    QMC5883_WriteByte(QMC5883_Control_Registers2, 0x08);
+    HAL_Delay(2);
+
+    // 连续模式，最高输出速率
+    QMC5883_WriteByte(QMC5883_Control_Registers1, 0xC3);
     HAL_Delay(10);
 }
 

@@ -5,23 +5,21 @@
 #ifndef AHRS_H
 #define AHRS_H
 
+#include <stdint.h>
 #include "quaternion.h"
 #include "ahrs_mw.h"
 
-// ============== 优化后的算法参数 ==============
-#define MAHONY_KP_DEFAULT   5.0f      // 提高比例增益，改善动态响应
-#define MAHONY_KI_DEFAULT   0.005f    // 降低积分增益，减少零漂累积
+#define MAHONY_KP_DEFAULT      2.8f
+#define MAHONY_KI_DEFAULT      0.06f
+#define MAHONY_KP_FAST         8.0f
+#define FAST_CONVERGE_TIME     1.5f
 
-// 积分限幅（防止积分饱和导致零漂）
-#define INTEGRAL_LIMIT      0.5f
+#define INTEGRAL_LIMIT         0.35f
 
-// 加速度计信任阈值（动态检测）
-#define ACC_NORM_MIN        0.85f     // 最小加速度模值
-#define ACC_NORM_MAX        1.15f     // 最大加速度模值
-
-// 快速收敛阶段参数
-#define FAST_CONVERGE_TIME  2.0f      // 快速收敛时间(秒)
-#define MAHONY_KP_FAST      15.0f     // 快速收敛阶段的Kp
+#define ACC_NORM_MIN           0.80f
+#define ACC_NORM_MAX           1.20f
+#define ACC_STILL_TOL          0.05f
+#define GYRO_STILL_THRESHOLD   0.03f
 
 // ============== AHRS 状态结构体 ==============
 typedef struct {
@@ -35,13 +33,12 @@ typedef struct {
     float pitch;
     float yaw;
 
-    // 动态Kp支持
     float Kp;
     float Ki;
 
-    // 收敛计时器
     float convergeTimer;
     uint8_t isConverged;
+    uint16_t stillCounter;
 
 } AHRS_State_t;
 

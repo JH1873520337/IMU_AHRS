@@ -1,6 +1,7 @@
 #ifndef __QMC5883_H
 #define __QMC5883_H
 
+#include <stdint.h>
 #include "stm32f4xx_hal.h"
 
 extern I2C_HandleTypeDef hi2c3;
@@ -25,6 +26,7 @@ extern I2C_HandleTypeDef hi2c3;
 
 #define QMC5883_Control_Registers1  0X0A     //控制寄存器1
 #define QMC5883_Control_Registers2  0X0B    //控制寄存器2
+#define QMC5883_Axis_Sign           0X29    //轴符号配置寄存器
 
 /* --- 新增 DMA 相关变量 --- */
 extern volatile uint8_t qmc5883_i2c_rx_done; // 完成标志

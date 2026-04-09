@@ -108,13 +108,12 @@ int main(void)
   AHRS_Init(&ahrs); // 初始化算法
 
   OLED_ShowString(1, 1, "AHRS Ready");
-  float dt = 0.01f; // 10ms = 100Hz
-  uint32_t last_tick = 0;
+  uint32_t imu_tick = HAL_GetTick();
+  uint32_t telemetry_tick = imu_tick;
+  uint32_t oled_tick = imu_tick;
+  uint32_t led_tick = imu_tick;
 
-
-  // 初始化后立即发一次
-  uint8_t test[] = "DMA TEST\r\n";
-  HAL_UART_Transmit_DMA(&huart1, test, sizeof(test));
+  AHRS_MW_RequestData();
 
   /* USER CODE END 2 */
 
@@ -122,42 +121,53 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9); // 假设这是你的LED
-    HAL_Delay(10);
-    // --- 100Hz 频率控制 ---
-    if (HAL_GetTick() - last_tick >= 10)
+    uint32_t now = HAL_GetTick();
+
+    if (AHRS_MW_IsDataReady())
     {
-      last_tick = HAL_GetTick();
+      float dt = (now - imu_tick) * 0.001f;
+      imu_tick = now;
 
-      // 1. 发起传感器读取 (DMA)
-      AHRS_MW_RequestData();
+      if (dt <= 0.0f)
+      {
+        dt = 0.001f;
+      }
+      if (dt > 0.02f)
+      {
+        dt = 0.02f;
+      }
 
-      // 简单延时等待DMA完成 (实际项目可用标志位优化)
-      // MPU6050读取约需 0.5ms，这里给一点余量或轮询标志位
-      while(!AHRS_MW_IsDataReady()) {}
-
-      // 2. 获取数据并解算
       if (AHRS_MW_GetData(&imu_data))
       {
-        // 运行 Mahony 算法
         AHRS_Update(&ahrs, &imu_data, dt);
-
-        // 计算欧拉角 (得到的是弧度)
         AHRS_GetEuler(&ahrs);
-
-        // 3. 发送到 Vofa+ (转换为角度)
-        // 通道顺序: 0:Roll, 1:Pitch, 2:Yaw
-        Telemetry_SendAttitude(
-            ahrs.roll * RAD_TO_DEG,
-            ahrs.pitch * RAD_TO_DEG,
-            ahrs.yaw * RAD_TO_DEG
-        );
-
-        // (可选) OLED 显示调试
-        OLED_ShowFloat(2, 1, ahrs.roll * RAD_TO_DEG, 3, 1);
-        OLED_ShowFloat(3, 1, ahrs.pitch * RAD_TO_DEG, 3, 1);
-        OLED_ShowFloat(4, 1, ahrs.yaw* RAD_TO_DEG, 3, 1);
       }
+
+      AHRS_MW_RequestData();
+    }
+
+    if ((now - telemetry_tick) >= 10U)
+    {
+      telemetry_tick = now;
+      Telemetry_SendAttitude(
+          ahrs.roll * RAD_TO_DEG,
+          ahrs.pitch * RAD_TO_DEG,
+          ahrs.yaw * RAD_TO_DEG
+      );
+    }
+
+    if ((now - oled_tick) >= 50U)
+    {
+      oled_tick = now;
+      OLED_ShowFloat(2, 1, ahrs.roll * RAD_TO_DEG, 3, 1);
+      OLED_ShowFloat(3, 1, ahrs.pitch * RAD_TO_DEG, 3, 1);
+      OLED_ShowFloat(4, 1, ahrs.yaw * RAD_TO_DEG, 3, 1);
+    }
+
+    if ((now - led_tick) >= 250U)
+    {
+      led_tick = now;
+      HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9);
     }
   }
     /* USER CODE END WHILE */
