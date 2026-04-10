@@ -23,7 +23,7 @@ extern I2C_HandleTypeDef hi2c2;
 
 /* 灵敏度系数 */
 #define ACCEL_SENSITIVITY     16384.0f
-#define GYRO_SENSITIVITY      131.0f
+#define GYRO_SENSITIVITY      65.5f
 
 /* DMA 标志位 */
 extern volatile uint8_t mpu6050_i2c_rx_done;

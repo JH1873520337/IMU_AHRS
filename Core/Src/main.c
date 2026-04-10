@@ -37,6 +37,7 @@
 /* USER CODE BEGIN PTD */
 #define RAD_TO_DEG 57.2957795f
 #define VOFA_SELFTEST 0
+#define TELEMETRY_MAG_RAW 0
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -64,6 +65,27 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void DWT_TimebaseInit(void)
+{
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0U;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+}
+
+static float DWT_GetDeltaSeconds(uint32_t *last_cycle)
+{
+  uint32_t now_cycle = DWT->CYCCNT;
+  uint32_t delta_cycle = now_cycle - *last_cycle;
+
+  *last_cycle = now_cycle;
+
+  if ((DWT->CTRL & DWT_CTRL_CYCCNTENA_Msk) == 0U || SystemCoreClock == 0U)
+  {
+    return 0.001f;
+  }
+
+  return (float)delta_cycle / (float)SystemCoreClock;
+}
 
 /* USER CODE END 0 */
 
@@ -115,15 +137,17 @@ int main(void)
   uint32_t last_led_tick = last_tx_tick;
   uint32_t tx_count = 0;
 #else
+  DWT_TimebaseInit();
   AHRS_MW_Init(); // 初始化传感器
   AHRS_Init(&ahrs); // 初始化算法
 
   OLED_ShowString(1, 1, "RPY RUN");
 
-  uint32_t imu_tick = HAL_GetTick();
-  uint32_t last_req_tick = imu_tick;
-  uint32_t last_oled_tick = imu_tick;
-  uint32_t last_telemetry_tick = imu_tick;
+  uint32_t imu_cycle_tick = DWT->CYCCNT;
+  uint32_t base_tick = HAL_GetTick();
+  uint32_t last_req_tick = base_tick;
+  uint32_t last_oled_tick = base_tick;
+  uint32_t last_telemetry_tick = base_tick;
   uint16_t led_div = 0;
 
   AHRS_MW_RequestData();
@@ -168,8 +192,7 @@ int main(void)
 
     if (AHRS_MW_IsDataReady())
     {
-      float dt = (now - imu_tick) * 0.001f;
-      imu_tick = now;
+      float dt = DWT_GetDeltaSeconds(&imu_cycle_tick);
 
       if (dt <= 0.0f)
       {
@@ -201,11 +224,15 @@ int main(void)
     if ((now - last_telemetry_tick) >= 10U)
     {
       last_telemetry_tick = now;
+#if TELEMETRY_MAG_RAW
+      Telemetry_SendMagRaw(imu_data.mx_raw, imu_data.my_raw, imu_data.mz_raw);
+#else
       Telemetry_SendAttitude(
           ahrs.roll * RAD_TO_DEG,
           ahrs.pitch * RAD_TO_DEG,
           ahrs.yaw * RAD_TO_DEG
       );
+#endif
     }
 
     if ((now - last_oled_tick) >= 50U)

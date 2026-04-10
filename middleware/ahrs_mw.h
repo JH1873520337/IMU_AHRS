@@ -24,6 +24,11 @@ typedef struct {
     float my;
     float mz;
 
+    // 原始磁力计数据 (单位: Gauss)，用于标定采样
+    float mx_raw;
+    float my_raw;
+    float mz_raw;
+
     // 数据有效标志位 (1=有效, 0=无效)
     uint8_t acc_valid;
     uint8_t gyro_valid;

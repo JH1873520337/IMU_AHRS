@@ -11,23 +11,28 @@ static const uint8_t tail[4] = {0x00, 0x00, 0x80, 0x7f};
 static uint32_t telemetry_attitude_calls = 0;
 static uint32_t telemetry_sensor_calls = 0;
 
+static void Telemetry_SendFloat3(float ch1, float ch2, float ch3)
+{
+    static uint8_t tx_buf[16];
+
+    memcpy(&tx_buf[0], &ch1, 4);
+    memcpy(&tx_buf[4], &ch2, 4);
+    memcpy(&tx_buf[8], &ch3, 4);
+    memcpy(&tx_buf[12], tail, 4);
+
+    Drv_UART_Transmit_DMA(tx_buf, 16);
+}
+
 void Telemetry_SendAttitude(float roll, float pitch, float yaw)
 {
     telemetry_attitude_calls++;
+    Telemetry_SendFloat3(roll, pitch, yaw);
+}
 
-    // 缓冲区: 3个float (12字节) + 帧尾 (4字节)
-    static uint8_t tx_buf[16];
-
-    // 1. 数据打包 (小端模式)
-    memcpy(&tx_buf[0], &roll, 4);
-    memcpy(&tx_buf[4], &pitch, 4);
-    memcpy(&tx_buf[8], &yaw, 4);
-
-    // 2. 添加帧尾
-    memcpy(&tx_buf[12], tail, 4);
-
-    // 3. 调用驱动层发送
-    Drv_UART_Transmit_DMA(tx_buf, 16);
+void Telemetry_SendMagRaw(float mx, float my, float mz)
+{
+    telemetry_sensor_calls++;
+    Telemetry_SendFloat3(mx, my, mz);
 }
 
 void Telemetry_SendSensors(float ax, float ay, float az, float gx, float gy, float gz)

@@ -6,7 +6,13 @@
 
 static float gyro_offset[3] = {0.0f, 0.0f, 0.0f};
 static float acc_offset[3] = {0.0f, 0.0f, 0.0f};
-static float mag_offset[3] = {0.0f, 0.0f, 0.0f};
+// 将椭球标定结果填到这里：m_cal = S * (m_raw - b)
+static const float mag_hardiron_bias[3] = {0.0f, 0.0f, 0.0f};
+static const float mag_softiron_matrix[3][3] = {
+    {1.0f, 0.0f, 0.0f},
+    {0.0f, 1.0f, 0.0f},
+    {0.0f, 0.0f, 1.0f}
+};
 
 static uint16_t still_counter = 0;
 static uint8_t mag_request_div = 0;
@@ -18,6 +24,18 @@ static uint8_t mag_request_div = 0;
 #define GYRO_DEADBAND_RAD_S        0.0015f
 #define MAG_NORM_MIN               0.01f
 #define MAG_NORM_MAX               2.0f
+
+static void Apply_Mag_Calibration(float raw_mx, float raw_my, float raw_mz,
+                                  float *mx, float *my, float *mz)
+{
+    float bx = raw_mx - mag_hardiron_bias[0];
+    float by = raw_my - mag_hardiron_bias[1];
+    float bz = raw_mz - mag_hardiron_bias[2];
+
+    *mx = mag_softiron_matrix[0][0] * bx + mag_softiron_matrix[0][1] * by + mag_softiron_matrix[0][2] * bz;
+    *my = mag_softiron_matrix[1][0] * bx + mag_softiron_matrix[1][1] * by + mag_softiron_matrix[1][2] * bz;
+    *mz = mag_softiron_matrix[2][0] * bx + mag_softiron_matrix[2][1] * by + mag_softiron_matrix[2][2] * bz;
+}
 
 static uint8_t Wait_For_MPU_Ready(uint32_t timeout_ms)
 {
@@ -131,6 +149,9 @@ uint8_t AHRS_MW_GetData(IMU_Data_t *data)
     data->mx = 0.0f;
     data->my = 0.0f;
     data->mz = 0.0f;
+    data->mx_raw = 0.0f;
+    data->my_raw = 0.0f;
+    data->mz_raw = 0.0f;
 
     MPU6050_ParseData(&raw_ax, &raw_ay, &raw_az, &raw_gx, &raw_gy, &raw_gz);
     mpu6050_i2c_rx_done = 0;
@@ -191,10 +212,17 @@ uint8_t AHRS_MW_GetData(IMU_Data_t *data)
 
         if (QMC5883_ParseData(&raw_mx, &raw_my, &raw_mz))
         {
-            float mx = raw_mx - mag_offset[0];
-            float my = raw_my - mag_offset[1];
-            float mz = raw_mz - mag_offset[2];
-            float mag_norm = sqrtf(mx * mx + my * my + mz * mz);
+            float mx;
+            float my;
+            float mz;
+            float mag_norm;
+
+            data->mx_raw = raw_mx;
+            data->my_raw = raw_my;
+            data->mz_raw = raw_mz;
+
+            Apply_Mag_Calibration(raw_mx, raw_my, raw_mz, &mx, &my, &mz);
+            mag_norm = sqrtf(mx * mx + my * my + mz * mz);
 
             if ((mag_norm > MAG_NORM_MIN) && (mag_norm < MAG_NORM_MAX))
             {

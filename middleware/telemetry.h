@@ -14,6 +14,7 @@
  */
 void Telemetry_SendAttitude(float roll, float pitch, float yaw);
 void Telemetry_GetStats(uint32_t *attitude_calls, uint32_t *sensor_calls);
+void Telemetry_SendMagRaw(float mx, float my, float mz);
 
 /**
  * @brief 发送传感器原始数据 (可选，用于调试)

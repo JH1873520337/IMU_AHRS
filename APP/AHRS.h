@@ -12,6 +12,8 @@
 #define MAHONY_KP_DEFAULT      2.8f
 #define MAHONY_KI_DEFAULT      0.06f
 #define MAHONY_KP_FAST         8.0f
+#define MAHONY_KP_MAG_DEFAULT  3.6f
+#define MAHONY_KI_MAG_DEFAULT  0.05f
 #define FAST_CONVERGE_TIME     1.5f
 
 #define INTEGRAL_LIMIT         0.35f
@@ -21,13 +23,24 @@
 #define ACC_STILL_TOL          0.05f
 #define GYRO_STILL_THRESHOLD   0.03f
 
+#define MAG_FIELD_TOL_RATIO    0.15f
+#define MAG_FIELD_REJECT_RATIO 0.35f
+#define MAG_INNOV_TOL          0.10f
+#define MAG_INNOV_REJECT       0.35f
+#define MAG_USE_MIN_WEIGHT     0.10f
+#define MAG_REF_ALPHA_MOVE     0.002f
+#define MAG_REF_ALPHA_STILL    0.010f
+
 // ============== AHRS 状态结构体 ==============
 typedef struct {
     Quaternion q;
 
-    float integralFBx;
-    float integralFBy;
-    float integralFBz;
+    float integralAccFBx;
+    float integralAccFBy;
+    float integralAccFBz;
+    float integralMagFBx;
+    float integralMagFBy;
+    float integralMagFBz;
 
     float roll;
     float pitch;
@@ -35,9 +48,13 @@ typedef struct {
 
     float Kp;
     float Ki;
+    float KpMag;
+    float KiMag;
+    float magFieldRef;
 
     float convergeTimer;
     uint8_t isConverged;
+    uint8_t magFieldReady;
     uint16_t stillCounter;
 
 } AHRS_State_t;

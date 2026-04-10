@@ -24,6 +24,35 @@ static float constrain_float(float val, float min_val, float max_val)
     return val;
 }
 
+static float fade_weight(float err, float full_weight_err, float reject_err)
+{
+    if (err <= full_weight_err)
+    {
+        return 1.0f;
+    }
+
+    if (err >= reject_err)
+    {
+        return 0.0f;
+    }
+
+    return 1.0f - (err - full_weight_err) / (reject_err - full_weight_err);
+}
+
+static void constrain_integral_vector(float *x, float *y, float *z)
+{
+    *x = constrain_float(*x, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+    *y = constrain_float(*y, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+    *z = constrain_float(*z, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+}
+
+static void decay_integral_vector(float *x, float *y, float *z, float factor)
+{
+    *x *= factor;
+    *y *= factor;
+    *z *= factor;
+}
+
 static float accel_weight(float acc_norm)
 {
     float err = fabsf(acc_norm - 1.0f);
@@ -33,12 +62,7 @@ static float accel_weight(float acc_norm)
         return 1.0f;
     }
 
-    if (err >= 0.25f)
-    {
-        return 0.0f;
-    }
-
-    return 1.0f - (err - ACC_STILL_TOL) / (0.25f - ACC_STILL_TOL);
+    return fade_weight(err, ACC_STILL_TOL, 0.25f);
 }
 
 static uint8_t is_stationary(float gx, float gy, float gz, float acc_norm)
@@ -51,6 +75,68 @@ static uint8_t is_stationary(float gx, float gy, float gz, float acc_norm)
     }
 
     return 0;
+}
+
+static float mag_norm_weight(AHRS_State_t *state, float mag_norm)
+{
+    if (mag_norm <= 1e-6f)
+    {
+        return 0.0f;
+    }
+
+    if (!state->magFieldReady)
+    {
+        state->magFieldRef = mag_norm;
+        state->magFieldReady = 1U;
+        return 1.0f;
+    }
+
+    if (state->magFieldRef <= 1e-6f)
+    {
+        return 0.0f;
+    }
+
+    return fade_weight(fabsf(mag_norm - state->magFieldRef) / state->magFieldRef,
+                       MAG_FIELD_TOL_RATIO,
+                       MAG_FIELD_REJECT_RATIO);
+}
+
+static float mag_innovation_weight(float ex, float ey, float ez)
+{
+    float innovation = sqrtf(ex * ex + ey * ey + ez * ez);
+    return fade_weight(innovation, MAG_INNOV_TOL, MAG_INNOV_REJECT);
+}
+
+static void reset_mag_feedback(AHRS_State_t *state)
+{
+    state->integralMagFBx = 0.0f;
+    state->integralMagFBy = 0.0f;
+    state->integralMagFBz = 0.0f;
+}
+
+static void update_mag_reference(AHRS_State_t *state, float mag_norm, float mag_weight, uint8_t stationary)
+{
+    float alpha;
+
+    if (mag_norm <= 1e-6f)
+    {
+        return;
+    }
+
+    if (!state->magFieldReady)
+    {
+        state->magFieldRef = mag_norm;
+        state->magFieldReady = 1U;
+        return;
+    }
+
+    if (mag_weight < 0.6f)
+    {
+        return;
+    }
+
+    alpha = stationary ? MAG_REF_ALPHA_STILL : MAG_REF_ALPHA_MOVE;
+    state->magFieldRef += alpha * (mag_norm - state->magFieldRef);
 }
 
 static void update_gain_stage(AHRS_State_t *state, float dt)
@@ -73,9 +159,12 @@ void AHRS_Init(AHRS_State_t *state)
     state->q.q3 = 0.0f;
     state->q.q4 = 0.0f;
 
-    state->integralFBx = 0.0f;
-    state->integralFBy = 0.0f;
-    state->integralFBz = 0.0f;
+    state->integralAccFBx = 0.0f;
+    state->integralAccFBy = 0.0f;
+    state->integralAccFBz = 0.0f;
+    state->integralMagFBx = 0.0f;
+    state->integralMagFBy = 0.0f;
+    state->integralMagFBz = 0.0f;
 
     state->roll = 0.0f;
     state->pitch = 0.0f;
@@ -83,16 +172,21 @@ void AHRS_Init(AHRS_State_t *state)
 
     state->Kp = MAHONY_KP_FAST;
     state->Ki = MAHONY_KI_DEFAULT;
+    state->KpMag = MAHONY_KP_MAG_DEFAULT;
+    state->KiMag = MAHONY_KI_MAG_DEFAULT;
+    state->magFieldRef = 0.0f;
     state->convergeTimer = 0.0f;
     state->isConverged = 0;
+    state->magFieldReady = 0;
     state->stillCounter = 0;
 }
 
 void AHRS_ResetIntegral(AHRS_State_t *state)
 {
-    state->integralFBx = 0.0f;
-    state->integralFBy = 0.0f;
-    state->integralFBz = 0.0f;
+    state->integralAccFBx = 0.0f;
+    state->integralAccFBy = 0.0f;
+    state->integralAccFBz = 0.0f;
+    reset_mag_feedback(state);
 }
 
 static void AHRS_Update6(AHRS_State_t *state,
@@ -161,26 +255,28 @@ static void AHRS_Update6(AHRS_State_t *state,
         ey = (az * vx - ax * vz);
         ez = (ax * vy - ay * vx);
 
+        decay_integral_vector(&state->integralMagFBx, &state->integralMagFBy, &state->integralMagFBz, 0.98f);
+
         if (ki_use > 0.0f)
         {
-            state->integralFBx += ki_use * ex * dt;
-            state->integralFBy += ki_use * ey * dt;
-            state->integralFBz += ki_use * ez * dt;
-
-            state->integralFBx = constrain_float(state->integralFBx, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
-            state->integralFBy = constrain_float(state->integralFBy, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
-            state->integralFBz = constrain_float(state->integralFBz, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+            state->integralAccFBx += ki_use * ex * dt;
+            state->integralAccFBy += ki_use * ey * dt;
+            state->integralAccFBz += ki_use * ez * dt;
+            constrain_integral_vector(&state->integralAccFBx, &state->integralAccFBy, &state->integralAccFBz);
         }
         else
         {
-            state->integralFBx *= 0.995f;
-            state->integralFBy *= 0.995f;
-            state->integralFBz *= 0.995f;
+            decay_integral_vector(&state->integralAccFBx, &state->integralAccFBy, &state->integralAccFBz, 0.995f);
         }
 
-        gx += kp_use * ex + state->integralFBx;
-        gy += kp_use * ey + state->integralFBy;
-        gz += kp_use * ez + state->integralFBz;
+        gx += kp_use * ex + state->integralAccFBx;
+        gy += kp_use * ey + state->integralAccFBy;
+        gz += kp_use * ez + state->integralAccFBz;
+    }
+    else
+    {
+        decay_integral_vector(&state->integralAccFBx, &state->integralAccFBy, &state->integralAccFBz, 0.995f);
+        decay_integral_vector(&state->integralMagFBx, &state->integralMagFBy, &state->integralMagFBz, 0.98f);
     }
 
     gx *= 0.5f * dt;
@@ -213,7 +309,8 @@ static void AHRS_Update9(AHRS_State_t *state,
     float q1q1, q1q2, q1q3, q1q4, q2q2, q2q3, q2q4, q3q3, q3q4, q4q4;
     float hx, hy, bx, bz;
     float vx, vy, vz, wx, wy, wz;
-    float ex, ey, ez;
+    float ex_acc, ey_acc, ez_acc;
+    float ex_mag, ey_mag, ez_mag;
     float qa, qb, qc;
     float q1 = state->q.q1;
     float q2 = state->q.q2;
@@ -221,9 +318,12 @@ static void AHRS_Update9(AHRS_State_t *state,
     float q4 = state->q.q4;
     float accNorm = sqrtf(ax * ax + ay * ay + az * az);
     float magNorm = sqrtf(mx * mx + my * my + mz * mz);
-    float kp_use;
-    float ki_use;
-    float weight;
+    float accWeight;
+    float magWeight;
+    float kp_acc;
+    float ki_acc;
+    float kp_mag;
+    float ki_mag;
     uint8_t stationary;
 
     if (dt <= 0.0f)
@@ -240,7 +340,7 @@ static void AHRS_Update9(AHRS_State_t *state,
     dt = constrain_float(dt, 0.0005f, 0.02f);
     update_gain_stage(state, dt);
 
-    weight = accel_weight(accNorm);
+    accWeight = accel_weight(accNorm);
     stationary = is_stationary(gx, gy, gz, accNorm);
 
     if (stationary)
@@ -253,15 +353,6 @@ static void AHRS_Update9(AHRS_State_t *state,
     else
     {
         state->stillCounter = 0;
-    }
-
-    kp_use = state->Kp * weight;
-    ki_use = state->Ki * weight;
-
-    if (state->stillCounter > 20U)
-    {
-        kp_use *= 1.4f;
-        ki_use *= 2.0f;
     }
 
     if (accNorm > 1e-6f)
@@ -306,30 +397,65 @@ static void AHRS_Update9(AHRS_State_t *state,
     wy = bx * (q2q3 - q1q4) + bz * (q1q2 + q3q4);
     wz = bx * (q1q3 + q2q4) + bz * (0.5f - q2q2 - q3q3);
 
-    ex = (ay * vz - az * vy) + (my * wz - mz * wy);
-    ey = (az * vx - ax * vz) + (mz * wx - mx * wz);
-    ez = (ax * vy - ay * vx) + (mx * wy - my * wx);
+    ex_acc = (ay * vz - az * vy);
+    ey_acc = (az * vx - ax * vz);
+    ez_acc = (ax * vy - ay * vx);
 
-    if (ki_use > 0.0f)
+    ex_mag = (my * wz - mz * wy);
+    ey_mag = (mz * wx - mx * wz);
+    ez_mag = (mx * wy - my * wx);
+
+    magWeight = mag_norm_weight(state, magNorm) * mag_innovation_weight(ex_mag, ey_mag, ez_mag);
+
+    if (magWeight < MAG_USE_MIN_WEIGHT)
     {
-        state->integralFBx += ki_use * ex * dt;
-        state->integralFBy += ki_use * ey * dt;
-        state->integralFBz += ki_use * ez * dt;
+        reset_mag_feedback(state);
+        AHRS_Update6(state, gx, gy, gz, ax, ay, az, dt);
+        return;
+    }
 
-        state->integralFBx = constrain_float(state->integralFBx, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
-        state->integralFBy = constrain_float(state->integralFBy, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
-        state->integralFBz = constrain_float(state->integralFBz, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+    kp_acc = state->Kp * accWeight;
+    ki_acc = state->Ki * accWeight;
+    kp_mag = state->KpMag * magWeight;
+    ki_mag = state->KiMag * magWeight;
+
+    if (state->stillCounter > 20U)
+    {
+        kp_acc *= 1.4f;
+        ki_acc *= 2.0f;
+        kp_mag *= 1.2f;
+        ki_mag *= 1.5f;
+    }
+
+    if (ki_acc > 0.0f)
+    {
+        state->integralAccFBx += ki_acc * ex_acc * dt;
+        state->integralAccFBy += ki_acc * ey_acc * dt;
+        state->integralAccFBz += ki_acc * ez_acc * dt;
+        constrain_integral_vector(&state->integralAccFBx, &state->integralAccFBy, &state->integralAccFBz);
     }
     else
     {
-        state->integralFBx *= 0.995f;
-        state->integralFBy *= 0.995f;
-        state->integralFBz *= 0.995f;
+        decay_integral_vector(&state->integralAccFBx, &state->integralAccFBy, &state->integralAccFBz, 0.995f);
     }
 
-    gx += kp_use * ex + state->integralFBx;
-    gy += kp_use * ey + state->integralFBy;
-    gz += kp_use * ez + state->integralFBz;
+    if (ki_mag > 0.0f)
+    {
+        state->integralMagFBx += ki_mag * ex_mag * dt;
+        state->integralMagFBy += ki_mag * ey_mag * dt;
+        state->integralMagFBz += ki_mag * ez_mag * dt;
+        constrain_integral_vector(&state->integralMagFBx, &state->integralMagFBy, &state->integralMagFBz);
+    }
+    else
+    {
+        decay_integral_vector(&state->integralMagFBx, &state->integralMagFBy, &state->integralMagFBz, 0.98f);
+    }
+
+    gx += kp_acc * ex_acc + kp_mag * ex_mag + state->integralAccFBx + state->integralMagFBx;
+    gy += kp_acc * ey_acc + kp_mag * ey_mag + state->integralAccFBy + state->integralMagFBy;
+    gz += kp_acc * ez_acc + kp_mag * ez_mag + state->integralAccFBz + state->integralMagFBz;
+
+    update_mag_reference(state, magNorm, magWeight, stationary);
 
     gx *= 0.5f * dt;
     gy *= 0.5f * dt;
