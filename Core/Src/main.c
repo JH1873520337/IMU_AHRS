@@ -36,7 +36,6 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 #define RAD_TO_DEG 57.2957795f
-#define VOFA_SELFTEST 0
 #define TELEMETRY_MAG_RAW 0
 /* USER CODE END PTD */
 
@@ -127,16 +126,6 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   OLED_Init();
-#if VOFA_SELFTEST
-  OLED_ShowString(1, 1, "VOFA TEST");
-  OLED_ShowString(2, 1, "CH1 +1.0");
-  OLED_ShowString(3, 1, "CH2 +2.0");
-  OLED_ShowString(4, 1, "CH3 +3.0");
-
-  uint32_t last_tx_tick = HAL_GetTick();
-  uint32_t last_led_tick = last_tx_tick;
-  uint32_t tx_count = 0;
-#else
   DWT_TimebaseInit();
   AHRS_MW_Init(); // 初始化传感器
   AHRS_Init(&ahrs); // 初始化算法
@@ -151,7 +140,6 @@ int main(void)
   uint16_t led_div = 0;
 
   AHRS_MW_RequestData();
-#endif
 
   /* USER CODE END 2 */
 
@@ -159,23 +147,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-#if VOFA_SELFTEST
-    uint32_t now = HAL_GetTick();
-
-    if ((now - last_tx_tick) >= 10U)
-    {
-      last_tx_tick = now;
-      tx_count++;
-      Telemetry_SendAttitude(1.0f, 2.0f, 3.0f);
-    }
-
-    if ((now - last_led_tick) >= 250U)
-    {
-      last_led_tick = now;
-      HAL_GPIO_TogglePin(GPIOF, GPIO_PIN_9);
-      OLED_ShowNum(1, 11, tx_count % 100000U, 5);
-    }
-#else
     uint32_t now;
 
     I2C_ServiceRecover();
@@ -246,7 +217,6 @@ int main(void)
 
       last_oled_tick = now;
     }
-#endif
   }
     /* USER CODE END WHILE */
 

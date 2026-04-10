@@ -46,8 +46,8 @@ void MPU6050_Init(void)
 
     // 配置采样率 (DLPF开启时: 1kHz / (1 + 0) = 1kHz)
     MPU6050_WriteByte_Block(MPU6050_SMPLRT_DIV, 0x00);
-    // 配置低通滤波到 94Hz，减小相位滞后
-    MPU6050_WriteByte_Block(MPU6050_CONFIG, 0x02);
+    // 配置低通滤波到 184Hz，进一步减小动态滞后
+    MPU6050_WriteByte_Block(MPU6050_CONFIG, 0x01);
     // 陀螺仪量程提升到 ±500dps，动态时不容易贴边
     MPU6050_WriteByte_Block(MPU6050_GYRO_CONFIG, 0x08);
     // 加速度量程 ±2g
